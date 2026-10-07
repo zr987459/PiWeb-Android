@@ -5,6 +5,9 @@ on:
     branches: [ "main" ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -19,15 +22,15 @@ jobs:
           distribution: 'temurin'
 
       - name: Setup Gradle
-        uses: gradle/gradle-build-action@v3
+        uses: gradle/actions/setup-gradle@v3
 
       - name: Build APK
-        run: ./gradlew assembleRelease --stacktrace || ./gradlew assembleDebug
+        run: gradle assembleDebug --stacktrace
 
-      - name: Get Release APK
+      - name: Prepare APK
         run: |
           mkdir -p output
-          find app/build/outputs/apk/ -name "*.apk" -exec cp {} output/PiWeb.apk \;
+          cp app/build/outputs/apk/debug/*.apk output/PiWeb.apk
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
@@ -35,13 +38,18 @@ jobs:
           name: PiWeb-APK
           path: output/PiWeb.apk
 
+      - name: Delete old release
+        run: |
+          gh release delete v1.0.0 -y --cleanup-tag || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/heads/main')
         with:
           tag_name: v1.0.0
           name: "Pi Web v1.0.0"
-          body: "### Pi Web 独立客户端 v1.0.0\n- 全屏极简沉浸 WebView 访问 127.0.0.1:30141\n- 支持服务未就绪时自动轮询重连与状态显示"
+          body: "### Pi Web 独立客户端 v1.0.0\n- 极简沉浸全屏连接 127.0.0.1:30141\n- 避开第三方浏览器 Loopback 限制\n- 未就绪时优雅重连探测"
           files: output/PiWeb.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
